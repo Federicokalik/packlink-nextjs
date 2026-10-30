@@ -14,6 +14,7 @@ runnable app on its own.
 | [`lib/create-shipment.ts`](./lib/create-shipment.ts)                                         | Buy / cancel a label without ever paying twice             |
 | [`app/api/packlink/shipping-options/route.ts`](./app/api/packlink/shipping-options/route.ts) | Checkout options                                           |
 | [`app/api/packlink/dropoffs/route.ts`](./app/api/packlink/dropoffs/route.ts)                 | Pickup points                                              |
+| [`app/api/packlink/postal-codes/route.ts`](./app/api/packlink/postal-codes/route.ts)         | Zip validation and autocomplete                            |
 | [`app/api/jobs/packlink-sync/route.ts`](./app/api/jobs/packlink-sync/route.ts)               | Route called by the scheduler                              |
 | [`app/checkout/dropoff-picker.tsx`](./app/checkout/dropoff-picker.tsx)                       | Pickup-point picker                                        |
 

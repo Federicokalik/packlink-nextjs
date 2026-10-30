@@ -9,7 +9,13 @@ import { resolveShippingOptions, type ShippingOption, type ShippingRules } from 
 import { cleanSecret, type PacklinkClient } from "../client";
 import { isPacklinkError } from "../errors";
 import { combineParcel, type ParcelLine } from "../parcel";
-import type { DropoffPointView, PacklinkDropoffPoint, PostalLocation } from "../types";
+import type {
+  DropoffPointView,
+  PacklinkDropoffPoint,
+  PacklinkPostalCode,
+  PostalCodeView,
+  PostalLocation,
+} from "../types";
 
 type Handler = (request: Request) => Promise<Response>;
 
@@ -110,6 +116,56 @@ export function createDropoffsRoute(options: DropoffsRouteOptions): { GET: Handl
           error,
         );
         return json({ error: "packlink_unavailable", points: [] }, 502);
+      }
+    },
+  };
+}
+
+export function toPostalCodeView(postalCode: PacklinkPostalCode): PostalCodeView {
+  const { raw: _raw, ...view } = postalCode;
+  return view;
+}
+
+export interface PostalCodesRouteOptions {
+  client: Pick<PacklinkClient, "lookupPostalCode" | "searchPostalCodes">;
+  onError?: (error: unknown) => void;
+}
+
+/**
+ * Two uses, one route:
+ *
+ * - `GET ?country=IT&zip=03100` → exact lookup, to validate a zip and fill in
+ *   the city: `{ valid, postalCodes }`;
+ * - `GET ?country=IT&q=frosi` → autocomplete on zip or city: `{ postalCodes }`.
+ *
+ * Answers 400 on invalid input and 502 when Packlink fails, so the checkout
+ * can choose to let the customer through instead of blocking on our side.
+ */
+export function createPostalCodesRoute(options: PostalCodesRouteOptions): { GET: Handler } {
+  return {
+    GET: async (request) => {
+      const params = new URL(request.url).searchParams;
+      const country = (params.get("country") ?? "").trim().toUpperCase();
+      const zip = (params.get("zip") ?? "").trim();
+      const query = (params.get("q") ?? "").trim();
+      if (!/^[A-Z]{2}$/.test(country) || (!zip && !query)) {
+        return json({ error: "invalid_query", postalCodes: [] }, 400);
+      }
+      if (zip.length > 16 || (!zip && (query.length < 2 || query.length > 64))) {
+        return json({ error: "invalid_query", postalCodes: [] }, 400);
+      }
+      try {
+        if (zip) {
+          const matches = await options.client.lookupPostalCode({ country, zip });
+          return json({ valid: matches.length > 0, postalCodes: matches.map(toPostalCodeView) });
+        }
+        const matches = await options.client.searchPostalCodes({ country, query });
+        return json({ postalCodes: matches.map(toPostalCodeView) });
+      } catch (error) {
+        (options.onError ?? ((e) => console.warn("[packlink] postal codes unavailable.", e)))(
+          error,
+        );
+        return json({ error: "packlink_unavailable", postalCodes: [] }, 502);
       }
     },
   };

@@ -22,8 +22,8 @@ export interface ShippingOption {
   amountCents: number;
   kind: ShippingOptionKind;
   packlinkServiceId?: number;
-  /** The customer must choose a pickup point before paying. */
-  requiresDropoff?: boolean;
+  /** The customer must choose a pickup point before paying (`useDropoffPoints`). */
+  requiresDropoffPoint?: boolean;
   carrierName?: string;
   serviceName?: string;
   transitTime?: string | null;
@@ -43,8 +43,8 @@ export interface ShippingRules {
   /** Use Packlink live quotes. Default `true`. */
   liveQuotes?: boolean;
   disabledCarriers?: string[];
-  /** Offer services that need a pickup point. Default `true`. */
-  includeDropoff?: boolean;
+  /** Offer services delivered to a pickup point the customer chooses. Default `true`. */
+  includeDropoffPoint?: boolean;
   /** Label of a Packlink option. Default "Carrier — Service". */
   formatLabel?: (service: PacklinkService) => string;
 }
@@ -109,7 +109,7 @@ export async function resolveShippingOptions(
         to: { zip: destination.zip!, country: destination.country! },
         parcels: [parcel],
         disabledCarriers: rules.disabledCarriers,
-        includeDropoff: rules.includeDropoff ?? true,
+        includeDropoffPoint: rules.includeDropoffPoint ?? true,
       });
       if (services.length > 0) {
         const formatLabel = rules.formatLabel ?? defaultServiceLabel;
@@ -120,7 +120,7 @@ export async function resolveShippingOptions(
             amountCents: priceWithVatAndMarkup(service.netCents, rules),
             kind: "packlink",
             packlinkServiceId: service.serviceId,
-            requiresDropoff: service.dropoff,
+            requiresDropoffPoint: service.requiresDropoffPoint,
             carrierName: service.carrierName,
             serviceName: service.serviceName,
             transitTime: service.transitTime,

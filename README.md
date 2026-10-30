@@ -19,10 +19,11 @@ independent of its database, catalog and hosting.
 > trademark of its owner and is used here only to describe what the package
 > connects to.
 
-- **Typed client** for the Packlink PRO API: services, pickup points, create / read / cancel shipments. Zero runtime dependencies.
+- **Typed client** for the Packlink PRO API: services, pickup points, postal codes, create / read / cancel shipments, labels. Zero runtime dependencies.
 - **Checkout that never breaks**: free shipping above a threshold → live quotes (net + VAT + your markup) → flat-rate fallback when Packlink is slow or down.
 - **Cart → one parcel**: weight and box size from your product data, with a packing model that errs on the safe side.
 - **Pickup points**: a route handler, a React hook, and an optional Leaflet map.
+- **Postal codes**: validate a zip and fill in the city before quoting, or autocomplete on zip or city name.
 - **Status sync on any scheduler**: a storage-agnostic engine and a secured route, with ready templates for Cloudflare Workers Cron, Vercel Cron, GitHub Actions and plain crontab.
 
 ## Contents
@@ -34,6 +35,8 @@ independent of its database, catalog and hosting.
 - [Units and conventions](#units-and-conventions)
 - [Errors](#errors)
 - [API](#api)
+- [Where the API shapes come from](#where-the-api-shapes-come-from)
+- [Compared to packlink-js](#compared-to-packlink-js)
 - [Runtime notes](#runtime-notes)
 - [Security](#security)
 - [Development](#development)
@@ -126,7 +129,7 @@ export const { POST } = createShippingOptionsRoute({
       "amountCents": 537,
       "kind": "packlink",
       "packlinkServiceId": 20945,
-      "requiresDropoff": true
+      "requiresDropoffPoint": true
     },
     {
       "id": "packlink-21021",
@@ -134,7 +137,7 @@ export const { POST } = createShippingOptionsRoute({
       "amountCents": 1103,
       "kind": "packlink",
       "packlinkServiceId": 21021,
-      "requiresDropoff": false
+      "requiresDropoffPoint": false
     },
     { "id": "pickup", "label": "In-store pickup", "amountCents": 0, "kind": "custom" }
   ],
@@ -169,16 +172,42 @@ const { points, loading, error, selectedId, select } = useDropoffPoints({
   serviceId: option?.packlinkServiceId,
   zip,
   country,
-  enabled: Boolean(option?.requiresDropoff),
+  enabled: Boolean(option?.requiresDropoffPoint),
 });
 
 <DropoffPointMap points={points} selectedId={selectedId} onSelect={select} />;
 ```
 
-Block the payment step while an option with `requiresDropoff` has no point
+Block the payment step while an option with `requiresDropoffPoint` has no point
 selected, and store `selectedId` with the order: the label needs it. The map is
 optional — the hook works with any UI. See
 [`dropoff-picker.tsx`](./examples/nextjs-app-router/app/checkout/dropoff-picker.tsx).
+
+`requiresDropoffPoint` comes from Packlink's `delivery_to_parcelshop`. Do not
+confuse it with Packlink's `dropoff` flag (`senderDropoff` here), which means
+that **you** hand the parcel in at a point instead of having it collected: the
+customer still gets it at home.
+
+### 4. Postal codes
+
+```ts
+// app/api/packlink/postal-codes/route.ts
+import { createPostalCodesRoute } from "packlink-nextjs/next";
+import { packlink } from "@/lib/packlink";
+
+export const dynamic = "force-dynamic";
+export const { GET } = createPostalCodesRoute({ client: packlink });
+```
+
+- `GET ?country=IT&zip=03100` → `{ valid, postalCodes }`: check the zip before
+  quoting and fill in city and province.
+- `GET ?country=IT&q=frosi` → `{ postalCodes }`: autocomplete on zip or city.
+
+On the server the same is `client.lookupPostalCode({ country, zip })` and
+`client.searchPostalCodes({ country, query })`. A search runs in every postal
+zone of the country (mainland, islands…); the zone list is cached by the client
+for 24 hours. When Packlink is unavailable the route answers 502: let the
+customer go on rather than blocking the checkout on a validation.
 
 ## Creating shipments
 
@@ -192,8 +221,13 @@ const shipment = await packlink.createShipment({
   customReference: order.number, // find it in the Packlink panel
   dropoffPointId: order.dropoffPointId,
 });
-// → { reference, status, trackingNumber, trackingUrl, labelUrl }
+// → { reference, status, trackingNumber, trackingNumbers, trackingUrl, labelUrl }
 ```
+
+The label is not part of the shipment and exists only once the shipment is
+paid on Packlink: read it with `getLabels(reference)` or
+`getShipment(reference, { includeLabels: true })`. The status sync fetches it
+for you until it is stored.
 
 Creating a shipment is billable, and **Packlink accepts an identical duplicate**:
 two clicks are two labels. Before calling `createShipment`, claim the order in
@@ -240,7 +274,7 @@ The store is a small interface over your own tables
 
 ```ts
 interface ShipmentSyncStore {
-  listOpen(limit: number): Promise<{ id; reference; status }[]>; // not final, least recently synced first
+  listOpen(limit: number): Promise<{ id; reference; status; labelUrl? }[]>; // not final, oldest sync first
   save(record, update): Promise<void>; // status, tracking, label, final flag
   acquireLock?(ttlMs: number): Promise<boolean>; // optional: no overlapping runs
   releaseLock?(): Promise<void>;
@@ -257,7 +291,9 @@ What the engine guarantees:
   (`UPDATE orders SET status = 'shipped' WHERE id = ? AND status = 'paid'`);
 - **unknown statuses never move an order**: Packlink states are free text, and
   only unambiguous ones are classified (`classifyShipmentStatus`, or pass your
-  own `classifyStatus`). The raw text is saved anyway.
+  own `classifyStatus`). The raw text is saved anyway;
+- **labels arrive on their own**: while a record has no `labelUrl`, each run
+  also asks for the label (`includeLabels: false` to turn it off).
 
 ### Triggering it
 
@@ -313,30 +349,35 @@ the flat rate, the pickup-point route answers 502, the sync counts a failure.
 
 ### `packlink-nextjs`
 
-| Export                                                                                   |                                                                                                                                      |
-| ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `createPacklinkClient(options)`                                                          | `apiKey`, `sender`, `baseUrl`, `currency` (EUR), `timeouts` (`read` 6 s, `write` 20 s), `fallbackDimensionsMm`, `fetch`, `fetchInit` |
-| `createPacklinkClientFromEnv(env?, overrides?)`                                          | Same, from `PACKLINK_*` variables                                                                                                    |
-| `client.listServices({ to, from?, parcels, disabledCarriers?, includeDropoff? })`        | Services, cheapest first                                                                                                             |
-| `client.listDropoffs({ serviceId, country, zip })`                                       | Pickup points                                                                                                                        |
-| `client.createShipment(input)` / `getShipment(ref)` / `cancelShipment(ref)`              | Shipments                                                                                                                            |
-| `client.request(method, path, { body?, timeoutMs? })`                                    | Any other endpoint                                                                                                                   |
-| `resolveShippingOptions(client, input)`                                                  | Checkout options with fallback                                                                                                       |
-| `priceWithVatAndMarkup(netCents, { vatPct, markupPct })`                                 | Net → gross                                                                                                                          |
-| `combineParcel(lines)`, `combineDimensions`, `hasCompleteParcelData`, `totalWeightGrams` | Cart → parcel                                                                                                                        |
-| `syncShipments({ client, store, limit?, lockTtlMs?, classifyStatus?, onTransition? })`   | Status sync                                                                                                                          |
-| `createMemoryShipmentStore(records)`                                                     | In-memory store for tests and scripts                                                                                                |
-| `classifyShipmentStatus(status)`, `isFinalProgress(progress)`                            | Status → `pending` / `shipped` / `delivered` / `terminal`                                                                            |
-| `normalizeCarrierName`, `cleanSecret`, `PacklinkError`, `isPacklinkError`                | Utilities                                                                                                                            |
+| Export                                                                                                 |                                                                                                                                                        |
+| ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `createPacklinkClient(options)`                                                                        | `apiKey`, `sender`, `baseUrl`, `currency` (EUR), `platform` (PRO), `timeouts` (`read` 6 s, `write` 20 s), `fallbackDimensionsMm`, `fetch`, `fetchInit` |
+| `createPacklinkClientFromEnv(env?, overrides?)`                                                        | Same, from `PACKLINK_*` variables                                                                                                                      |
+| `client.listServices({ to, from?, parcels, disabledCarriers?, includeDropoffPoint? })`                 | Services, cheapest first                                                                                                                               |
+| `client.listDropoffs({ serviceId, country, zip })`                                                     | Pickup points                                                                                                                                          |
+| `client.createShipment(input)` / `getShipment(ref, { includeLabels? })` / `cancelShipment(ref)`        | Shipments                                                                                                                                              |
+| `client.getLabels(ref)`                                                                                | Label URLs, empty until the shipment is paid                                                                                                           |
+| `client.lookupPostalCode({ country, zip })`                                                            | Places of an exact zip — empty when unknown                                                                                                            |
+| `client.searchPostalCodes({ country, query, postalZoneId? })`                                          | Autocomplete on zip or city                                                                                                                            |
+| `client.listPostalZones({ country, language? })`                                                       | Delivery zones of a country, cached 24 h                                                                                                               |
+| `client.request(method, path, { body?, timeoutMs? })`                                                  | Any other endpoint                                                                                                                                     |
+| `resolveShippingOptions(client, input)`                                                                | Checkout options with fallback                                                                                                                         |
+| `priceWithVatAndMarkup(netCents, { vatPct, markupPct })`                                               | Net → gross                                                                                                                                            |
+| `combineParcel(lines)`, `combineDimensions`, `hasCompleteParcelData`, `totalWeightGrams`               | Cart → parcel                                                                                                                                          |
+| `syncShipments({ client, store, limit?, lockTtlMs?, classifyStatus?, includeLabels?, onTransition? })` | Status sync                                                                                                                                            |
+| `createMemoryShipmentStore(records)`                                                                   | In-memory store for tests and scripts                                                                                                                  |
+| `classifyShipmentStatus(status)`, `isFinalProgress(progress)`                                          | Status → `pending` / `shipped` / `delivered` / `terminal`                                                                                              |
+| `normalizeCarrierName`, `cleanSecret`, `PacklinkError`, `isPacklinkError`                              | Utilities                                                                                                                                              |
 
 ### `packlink-nextjs/next`
 
-| Export                                                                                | Route                                       |
-| ------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `createShippingOptionsRoute({ client, resolveCart, rules, extraOptions?, onError? })` | `POST` → `{ options, subtotalCents }`       |
-| `createDropoffsRoute({ client, onError? })`                                           | `GET ?serviceId&zip&country` → `{ points }` |
-| `createSyncRoute({ secret, run })`                                                    | `GET` and `POST`, bearer-protected          |
-| `isAuthorizedCronRequest(request, secret)`                                            | Constant-time bearer check                  |
+| Export                                                                                | Route                                                                               |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `createShippingOptionsRoute({ client, resolveCart, rules, extraOptions?, onError? })` | `POST` → `{ options, subtotalCents }`                                               |
+| `createDropoffsRoute({ client, onError? })`                                           | `GET ?serviceId&zip&country` → `{ points }`                                         |
+| `createPostalCodesRoute({ client, onError? })`                                        | `GET ?country&zip` → `{ valid, postalCodes }`, `GET ?country&q` → `{ postalCodes }` |
+| `createSyncRoute({ secret, run })`                                                    | `GET` and `POST`, bearer-protected                                                  |
+| `isAuthorizedCronRequest(request, secret)`                                            | Constant-time bearer check                                                          |
 
 `rules` and `extraOptions` can also be functions of the resolved cart, e.g. to
 read the configuration from your database or to price per shipping class.
@@ -350,6 +391,60 @@ read the configuration from your database or to price per shipping class.
 — renders nothing when no point has coordinates. Leaflet is imported in an
 effect, so the component is safe to server-render; remember
 `import "leaflet/dist/leaflet.css"`.
+
+## Where the API shapes come from
+
+Field names and endpoints follow two sources:
+
+1. **Production use** on creattivamente.shop: quotes, pickup points, shipment
+   creation and cancellation, status sync.
+2. **Packlink's own open-source module core**,
+   [packlink-dev/ecommerce_module_core](https://github.com/packlink-dev/ecommerce_module_core)
+   (the shared library behind the official WooCommerce, PrestaShop and Magento
+   plugins): its HTTP proxy and the API responses in its test fixtures. The
+   normalizers in `src/normalize.ts` read those field names first.
+
+Postal codes, `getLabels`, tracking numbers from `trackings` and the
+`delivery_to_parcelshop` flag are implemented from the second source only and
+have not run in production yet. If a real response looks different, please
+[open an issue](https://github.com/federicokalik/packlink-nextjs/issues) with
+the payload, personal data removed.
+
+Not included on purpose: a shipment **list**. Neither the official module nor
+this package's production use calls one, so there is no confirmed endpoint
+behind it.
+
+## Compared to packlink-js
+
+[packlink-js](https://github.com/MwSpaceLLC/packlink-js) (MwSpace, Apache-2.0)
+is the other unofficial JavaScript client for Packlink PRO. As of version
+1.0.48 (October 2026):
+
+|                                                          | packlink-nextjs                                      | packlink-js                                |
+| -------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------ |
+| Language                                                 | TypeScript, ESM + CJS, type definitions              | JavaScript (CommonJS), no type definitions |
+| Runtime dependencies                                     | none (Fetch API)                                     | `axios`, `qs`                              |
+| Configuration                                            | one client per instance                              | one API key for the whole process (static) |
+| Errors                                                   | throws `PacklinkError` with `code`, `status`, `body` | logs and returns `{ error }` as a result   |
+| Timeouts                                                 | 6 s reads, 20 s writes                               | none configured                            |
+| Services / quotes                                        | ✓ normalized, cheapest first, carrier filter         | ✓ raw response                             |
+| Default parcel without dimensions                        | 20 × 20 × 20 cm                                      | 5 × 5 × 5 cm (`Carrier.quote`)             |
+| Pickup points                                            | ✓ with route, React hook and map                     | —                                          |
+| Create / read / cancel shipments                         | ✓                                                    | ✓                                          |
+| Shipment labels                                          | ✓                                                    | —                                          |
+| List shipments                                           | — (see above)                                        | ✓ (`GET /shipments`)                       |
+| Postal codes                                             | exact lookup + search by postal zone                 | search in the configured country           |
+| Warehouses (sender addresses saved on Packlink)          | — (sender comes from your config)                    | ✓ list, create, update, delete             |
+| Dashboard statistics                                     | —                                                    | ✓                                          |
+| Checkout helpers (free threshold, VAT, markup, fallback) | ✓                                                    | —                                          |
+| Next.js route handlers                                   | ✓                                                    | —                                          |
+| Scheduled status sync + scheduler templates              | ✓                                                    | —                                          |
+| Tests                                                    | ✓ vitest, CI on Node 20/22/24                        | none in the repository                     |
+| License                                                  | MIT                                                  | Apache-2.0                                 |
+
+If you need to manage warehouses or read dashboard statistics, packlink-js
+covers them out of the box; here they are one `client.request()` call away,
+without types.
 
 ## Runtime notes
 

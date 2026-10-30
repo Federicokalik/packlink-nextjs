@@ -27,12 +27,12 @@ export function DropoffPicker({
     serviceId: option?.packlinkServiceId,
     zip,
     country,
-    enabled: Boolean(option?.requiresDropoff),
+    enabled: Boolean(option?.requiresDropoffPoint),
   });
 
   useEffect(() => onChange(selectedId), [selectedId, onChange]);
 
-  if (!option?.requiresDropoff) return null;
+  if (!option?.requiresDropoffPoint) return null;
   if (loading) return <p>Looking for pickup points near you…</p>;
   if (error)
     return <p role="alert">Pickup points are not available right now. Try again shortly.</p>;

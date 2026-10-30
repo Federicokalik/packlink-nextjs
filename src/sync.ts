@@ -22,6 +22,8 @@ export interface TrackedShipment {
   reference: string;
   /** Last Packlink status you saved; used to detect transitions. */
   status: string | null;
+  /** Label already saved: when set, the label is not asked for again. */
+  labelUrl?: string | null;
 }
 
 export interface ShipmentUpdate {
@@ -62,6 +64,12 @@ export interface SyncShipmentsOptions<T extends TrackedShipment = TrackedShipmen
   /** Lock lease. Default 5 minutes: longer than any run, short enough to recover from a crash. */
   lockTtlMs?: number;
   classifyStatus?: (status: string | null) => ShipmentProgress;
+  /**
+   * Fetch the label for shipments that do not have one saved yet (one extra
+   * request each, until it exists). Default `true`; return `labelUrl` from
+   * `listOpen` so that it stops once the label is stored.
+   */
+  includeLabels?: boolean;
   /**
    * Called when the progress changes, before the new state is saved: if it
    * throws, nothing is saved and the next run retries the transition. It can
@@ -116,7 +124,9 @@ export async function syncShipments<T extends TrackedShipment>(
     for (const record of records) {
       result.processed += 1;
       try {
-        const shipment = await client.getShipment(record.reference);
+        const shipment = await client.getShipment(record.reference, {
+          includeLabels: (options.includeLabels ?? true) && !record.labelUrl,
+        });
         const previousProgress = classify(record.status);
         const progress = classify(shipment.status);
         const update: ShipmentUpdate = {
@@ -190,12 +200,13 @@ export function createMemoryShipmentStore(initial: TrackedShipment[] = []): Memo
         .filter((record) => !record.final)
         .sort((a, b) => (a.syncedAt?.getTime() ?? 0) - (b.syncedAt?.getTime() ?? 0))
         .slice(0, limit)
-        .map(({ id, reference, status }) => ({ id, reference, status }));
+        .map(({ id, reference, status, labelUrl }) => ({ id, reference, status, labelUrl }));
     },
     async save(record, update) {
       const current = records.get(String(record.id));
       if (!current) return;
       current.status = update.shipment.status;
+      current.labelUrl = update.shipment.labelUrl ?? current.labelUrl ?? null;
       current.final = update.final;
       current.syncedAt = update.syncedAt;
     },

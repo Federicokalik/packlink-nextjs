@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PacklinkError, type PacklinkDropoffPoint } from "../src";
 import {
   createDropoffsRoute,
+  createPostalCodesRoute,
   createShippingOptionsRoute,
   createSyncRoute,
   isAuthorizedCronRequest,
@@ -20,7 +21,7 @@ function withAuth(value: string | null, method = "POST") {
 describe("isAuthorizedCronRequest", () => {
   it("accepts only the exact bearer secret", () => {
     expect(isAuthorizedCronRequest(withAuth("Bearer s3cret"), "s3cret")).toBe(true);
-    expect(isAuthorizedCronRequest(withAuth("bearer s3cret"), "﻿s3cret ")).toBe(true);
+    expect(isAuthorizedCronRequest(withAuth("bearer s3cret"), "\uFEFFs3cret ")).toBe(true);
     expect(isAuthorizedCronRequest(withAuth("Bearer s3cre"), "s3cret")).toBe(false);
     expect(isAuthorizedCronRequest(withAuth("Bearer s3cretX"), "s3cret")).toBe(false);
     expect(isAuthorizedCronRequest(withAuth(null), "s3cret")).toBe(false);
@@ -122,7 +123,8 @@ describe("createShippingOptionsRoute", () => {
         carrierName: "GLS",
         netCents: 1000,
         transitTime: null,
-        dropoff: false,
+        requiresDropoffPoint: false,
+        senderDropoff: false,
         raw: {},
       },
     ]),
@@ -182,5 +184,53 @@ describe("createShippingOptionsRoute", () => {
     const empty = await POST(new Request(`${URL_BASE}/x`, { method: "POST", body: "{}" }));
     expect(notJson.status).toBe(400);
     expect(await empty.json()).toEqual({ error: "invalid_cart" });
+  });
+});
+
+describe("createPostalCodesRoute", () => {
+  const hit = {
+    id: "pc_it_1",
+    zip: "03100",
+    city: "Frosinone",
+    province: null,
+    state: null,
+    countryCode: "IT",
+    label: "03100 - Frosinone",
+    latitude: null,
+    longitude: null,
+    raw: { internal: true },
+  };
+
+  it("validates an exact zip or searches, without the raw payload", async () => {
+    const lookupPostalCode = vi.fn(async () => [hit]);
+    const searchPostalCodes = vi.fn(async () => [hit]);
+    const { GET } = createPostalCodesRoute({ client: { lookupPostalCode, searchPostalCodes } });
+
+    const exact = (await (await GET(new Request(`${URL_BASE}/x?country=it&zip=03100`))).json()) as {
+      valid: boolean;
+      postalCodes: Array<Record<string, unknown>>;
+    };
+    expect(exact.valid).toBe(true);
+    expect(exact.postalCodes[0]).toMatchObject({ zip: "03100", city: "Frosinone" });
+    expect(exact.postalCodes[0]).not.toHaveProperty("raw");
+    expect(lookupPostalCode).toHaveBeenCalledWith({ country: "IT", zip: "03100" });
+
+    const search = (await (await GET(new Request(`${URL_BASE}/x?country=IT&q=fro`))).json()) as {
+      postalCodes: unknown[];
+    };
+    expect(search.postalCodes).toHaveLength(1);
+    expect(searchPostalCodes).toHaveBeenCalledWith({ country: "IT", query: "fro" });
+  });
+
+  it("rejects bad queries and reports Packlink failures as 502", async () => {
+    const failing = vi.fn().mockRejectedValue(new Error("down"));
+    const { GET } = createPostalCodesRoute({
+      client: { lookupPostalCode: failing, searchPostalCodes: failing },
+      onError: () => {},
+    });
+    expect((await GET(new Request(`${URL_BASE}/x?country=ITA&zip=1`))).status).toBe(400);
+    expect((await GET(new Request(`${URL_BASE}/x?country=IT&q=f`))).status).toBe(400);
+    expect((await GET(new Request(`${URL_BASE}/x?country=IT`))).status).toBe(400);
+    expect((await GET(new Request(`${URL_BASE}/x?country=IT&zip=03100`))).status).toBe(502);
   });
 });

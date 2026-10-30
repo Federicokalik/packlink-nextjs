@@ -66,11 +66,11 @@ export async function createShipmentForOrder(orderId: number): Promise<PacklinkS
   const services = await packlink.listServices({
     to: { zip: to.zip, country: to.country },
     parcels: [parcel],
-    includeDropoff: Boolean(dropoffPointId),
+    includeDropoffPoint: Boolean(dropoffPointId),
   });
   const service = chosenServiceId
     ? services.find((candidate) => candidate.serviceId === chosenServiceId)
-    : services.find((candidate) => !candidate.dropoff);
+    : services.find((candidate) => !candidate.requiresDropoffPoint);
   if (!service) {
     throw new Error(
       chosenServiceId

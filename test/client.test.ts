@@ -5,8 +5,16 @@ import { jsonResponse, mockFetch, SENDER } from "./helpers";
 
 const services = [
   { id: 3, name: "Express", carrier_name: "BRT", base_price: "9.80", transit_time: "1 day" },
-  { id: 1, name: "Standard", carrier_name: "Poste Italiane", base_price: 6.5, dropoff: false },
-  { id: 2, name: "Punto", carrier_name: "InPost", base_price: 4.1, dropoff: true },
+  // Sender drops it off, but it is delivered to the door: no pickup point to choose.
+  { id: 1, name: "Standard", carrier_name: "Poste Italiane", base_price: 6.5, dropoff: true },
+  {
+    id: 2,
+    name: "Punto",
+    carrier_name: "InPost",
+    price: { base_price: 4.1 },
+    dropoff: true,
+    delivery_to_parcelshop: true,
+  },
   { id: 0, name: "Broken", carrier_name: "X", base_price: 1 },
   { id: 9, name: "Free?", carrier_name: "Y", base_price: 0 },
 ];
@@ -14,7 +22,7 @@ const services = [
 describe("listServices", () => {
   it("quotes the route with the API key as-is and converts units", async () => {
     const { fetch, calls } = mockFetch(jsonResponse(services));
-    const client = createPacklinkClient({ apiKey: "﻿ secret-key ", sender: SENDER, fetch });
+    const client = createPacklinkClient({ apiKey: "\uFEFF secret-key ", sender: SENDER, fetch });
 
     const result = await client.listServices({
       to: { zip: " 20121 ", country: "it" },
@@ -36,13 +44,13 @@ describe("listServices", () => {
       "packages[0][length]": "30",
       sortBy: "totalPrice",
     });
-    expect(result.map((service) => [service.serviceId, service.netCents, service.dropoff])).toEqual(
-      [
-        [2, 410, true],
-        [1, 650, false],
-        [3, 980, false],
-      ],
-    );
+    expect(
+      result.map((service) => [service.serviceId, service.netCents, service.requiresDropoffPoint]),
+    ).toEqual([
+      [2, 410, true],
+      [1, 650, false],
+      [3, 980, false],
+    ]);
     expect(result[2]!.transitTime).toBe("1 day");
   });
 
@@ -66,7 +74,7 @@ describe("listServices", () => {
       to: { zip: "00100", country: "IT" },
       parcels: [{ weightGrams: 500 }],
       disabledCarriers: ["poste-italiane"],
-      includeDropoff: false,
+      includeDropoffPoint: false,
     });
     expect(result.map((service) => service.serviceId)).toEqual([3]);
   });
@@ -285,5 +293,67 @@ describe("shipments", () => {
     await client.cancelShipment("IT2026ABC");
     expect(calls[0]).toMatchObject({ method: "DELETE" });
     expect(calls[0]!.url.pathname).toBe("/v1/shipments/IT2026ABC");
+  });
+});
+
+describe("official response shapes", () => {
+  // Field names as in the responses used by Packlink's open-source module core.
+  it("reads reference and tracking numbers from a shipment", async () => {
+    const { fetch } = mockFetch(
+      jsonResponse({
+        packlink_reference: "IT2026XYZ",
+        state: "IN_TRANSIT",
+        trackings: ["31016279", "31016280"],
+        tracking_url: "https://carrier.example/track",
+        carrier: "BRT",
+      }),
+    );
+    const client = createPacklinkClient({ apiKey: "k", sender: SENDER, fetch });
+    expect(await client.getShipment("IT2026XYZ")).toMatchObject({
+      reference: "IT2026XYZ",
+      status: "IN_TRANSIT",
+      trackingNumber: "31016279",
+      trackingNumbers: ["31016279", "31016280"],
+      trackingUrl: "https://carrier.example/track",
+      labelUrl: null,
+    });
+  });
+
+  it("asks for the label only when requested, and treats 404 as not ready", async () => {
+    const { fetch, calls } = mockFetch(
+      jsonResponse({ packlink_reference: "A", state: "READY_TO_PRINT" }),
+      jsonResponse(["https://labels.example/A.pdf"]),
+      jsonResponse({ packlink_reference: "B", state: "READY_TO_PURCHASE" }),
+      new Response('{"messages":[]}', { status: 404 }),
+      new Response("boom", { status: 500 }),
+    );
+    const client = createPacklinkClient({ apiKey: "k", sender: SENDER, fetch });
+
+    expect((await client.getShipment("A", { includeLabels: true })).labelUrl).toBe(
+      "https://labels.example/A.pdf",
+    );
+    expect(calls[1]!.url.pathname).toBe("/v1/shipments/A/labels");
+    expect((await client.getShipment("B", { includeLabels: true })).labelUrl).toBeNull();
+    await expect(client.getLabels("C")).rejects.toMatchObject({ code: "http", status: 500 });
+  });
+
+  it("unwraps the nested opening times of pickup points", async () => {
+    const { fetch } = mockFetch(
+      jsonResponse([
+        {
+          id: "164047",
+          commerce_name: "Edicola",
+          address: "Via Po 2",
+          zip: "00100",
+          city: "Roma",
+          lat: 41.9,
+          long: 12.5,
+          opening_times: { opening_times: { monday: "09:00-13:00", sunday: "" } },
+        },
+      ]),
+    );
+    const client = createPacklinkClient({ apiKey: "k", sender: SENDER, fetch });
+    const [point] = await client.listDropoffs({ serviceId: 1, country: "IT", zip: "00100" });
+    expect(point!.openingHours).toEqual({ monday: "09:00-13:00" });
   });
 });

@@ -49,8 +49,13 @@ export interface PacklinkService {
   /** Packlink `base_price`: what you pay, VAT excluded, in cents. */
   netCents: number;
   transitTime: string | null;
-  /** The customer has to choose a pickup point: it cannot be sold as home delivery. */
-  dropoff: boolean;
+  /**
+   * Delivered to a pickup point the customer chooses (`delivery_to_parcelshop`):
+   * it cannot be sold as home delivery, and the shipment needs a `dropoffPointId`.
+   */
+  requiresDropoffPoint: boolean;
+  /** You hand the parcel in at a drop-off point instead of a collection (`dropoff`). */
+  senderDropoff: boolean;
   raw: Record<string, unknown>;
 }
 
@@ -73,8 +78,43 @@ export interface PacklinkShipment {
   reference: string;
   /** Packlink state as returned by the API (free text); see `classifyShipmentStatus`. */
   status: string | null;
+  /** First of `trackingNumbers`: one per parcel. */
   trackingNumber: string | null;
+  trackingNumbers: string[];
   trackingUrl: string | null;
+  /**
+   * The shipment payload has no labels: they come from a separate endpoint and
+   * exist only once the shipment is paid. Filled by `getShipment(ref, { includeLabels: true })`.
+   */
   labelUrl: string | null;
+  raw: Record<string, unknown>;
+}
+
+/** A zip code known to Packlink, with the place it belongs to. */
+export interface PacklinkPostalCode {
+  id: string;
+  zip: string;
+  city: string;
+  /** Province / county, when Packlink returns it (exact lookups only). */
+  province: string | null;
+  /** Region or state as Packlink names it. */
+  state: string | null;
+  countryCode: CountryCode | null;
+  /** Ready-made text such as "03100 - Frosinone". */
+  label: string;
+  latitude: number | null;
+  longitude: number | null;
+  raw: Record<string, unknown>;
+}
+
+export type PostalCodeView = Omit<PacklinkPostalCode, "raw">;
+
+/** A delivery area of a country (e.g. mainland vs islands), used to scope postal code searches. */
+export interface PacklinkPostalZone {
+  id: string;
+  name: string;
+  countryCode: CountryCode;
+  hasPostalCodes: boolean;
+  phonePrefix: string | null;
   raw: Record<string, unknown>;
 }

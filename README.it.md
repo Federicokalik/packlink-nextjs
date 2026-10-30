@@ -20,10 +20,11 @@ ed è più dettagliata sulle API.
 > Non affiliato né approvato da Packlink. "Packlink" è un marchio del rispettivo
 > titolare, citato solo per indicare il servizio a cui il pacchetto si collega.
 
-- **Client tipizzato** per l'API Packlink PRO: servizi, punti di ritiro, creazione / lettura / annullo spedizioni. Nessuna dipendenza a runtime.
+- **Client tipizzato** per l'API Packlink PRO: servizi, punti di ritiro, CAP, creazione / lettura / annullo spedizioni, etichette. Nessuna dipendenza a runtime.
 - **Checkout che non si rompe mai**: gratis sopra soglia → quota live (netto + IVA + margine) → tariffa flat se Packlink è lento o giù.
 - **Dal carrello a un collo**: peso e ingombro dai dati prodotto, con un modello di imballo che sbaglia dal lato giusto.
 - **Punti di ritiro**: route handler, hook React e mappa Leaflet opzionale.
+- **CAP**: verifica del CAP con città e provincia prima della quota, oppure autocompletamento su CAP o città.
 - **Sync degli stati con qualsiasi scheduler**: motore indipendente dallo storage e route protetta, con template pronti per Cloudflare Workers Cron, Vercel Cron, GitHub Actions e crontab.
 
 ## Installazione
@@ -122,14 +123,40 @@ const { points, selectedId, select } = useDropoffPoints({
   serviceId: option?.packlinkServiceId,
   zip,
   country,
-  enabled: Boolean(option?.requiresDropoff),
+  enabled: Boolean(option?.requiresDropoffPoint),
 });
 
 <DropoffPointMap points={points} selectedId={selectedId} onSelect={select} />;
 ```
 
-Blocca il pagamento finché un'opzione con `requiresDropoff` non ha un punto
+Blocca il pagamento finché un'opzione con `requiresDropoffPoint` non ha un punto
 scelto, e salva `selectedId` con l'ordine: serve per l'etichetta.
+
+`requiresDropoffPoint` viene dal campo Packlink `delivery_to_parcelshop`. Da non
+confondere con il flag `dropoff` (qui `senderDropoff`), che significa che è **il
+negozio** a portare il pacco in un punto invece di farlo ritirare: il cliente lo
+riceve comunque a casa.
+
+### 4. CAP
+
+```ts
+// app/api/packlink/postal-codes/route.ts
+import { createPostalCodesRoute } from "packlink-nextjs/next";
+import { packlink } from "@/lib/packlink";
+
+export const dynamic = "force-dynamic";
+export const { GET } = createPostalCodesRoute({ client: packlink });
+```
+
+- `GET ?country=IT&zip=03100` → `{ valid, postalCodes }`: verifica il CAP prima
+  della quota e compila città e provincia.
+- `GET ?country=IT&q=frosi` → `{ postalCodes }`: autocompletamento su CAP o città.
+
+Lato server: `client.lookupPostalCode({ country, zip })` e
+`client.searchPostalCodes({ country, query })`. La ricerca gira in tutte le zone
+postali del paese (penisola, isole…), con l'elenco delle zone in cache per 24 ore.
+Se Packlink non risponde la route dà 502: meglio lasciar proseguire il cliente
+che bloccare il checkout su una verifica.
 
 ## Creare le spedizioni
 
@@ -149,6 +176,11 @@ Inoltre:
 
 Lo schema completo è in
 [`create-shipment.ts`](./examples/nextjs-app-router/lib/create-shipment.ts).
+
+L'etichetta non fa parte della spedizione ed esiste solo dopo il pagamento su
+Packlink: si legge con `getLabels(reference)` o
+`getShipment(reference, { includeLabels: true })`. La sincronizzazione la
+recupera da sola finché non è salvata.
 
 ## Sincronizzazione degli stati (cron)
 
@@ -182,7 +214,9 @@ garantisce:
 - **transizioni almeno una volta**: `onTransition` gira prima del salvataggio; se
   fallisce non si salva niente e il giro dopo riprova. Rendila idempotente;
 - **uno stato sconosciuto non muove mai un ordine**: gli stati Packlink sono
-  testo libero e si classificano solo quelli non ambigui.
+  testo libero e si classificano solo quelli non ambigui;
+- **l'etichetta arriva da sola**: finché un record non ha `labelUrl`, ogni giro
+  la richiede (`includeLabels: false` per disattivarlo).
 
 Lo scheduler è a scelta: basta chiamare la route con
 `Authorization: Bearer <segreto>`.
@@ -212,6 +246,57 @@ volta al giorno: lì conviene Cloudflare o GitHub Actions.
 Ogni metodo del client lancia un `PacklinkError` con un `code`:
 `not_configured`, `invalid_input`, `http` (con `status` e `body`), `network`,
 `invalid_response`. Usa `isPacklinkError(error)` invece di `instanceof`.
+
+## Da dove vengono le forme dell'API
+
+Nomi dei campi ed endpoint seguono due fonti:
+
+1. **L'uso in produzione** su creattivamente.shop: quote, punti di ritiro,
+   creazione e annullo spedizioni, sincronizzazione degli stati.
+2. **Il modulo open source di Packlink**,
+   [packlink-dev/ecommerce_module_core](https://github.com/packlink-dev/ecommerce_module_core)
+   (la libreria comune ai plugin ufficiali WooCommerce, PrestaShop e Magento):
+   il suo proxy HTTP e le risposte dell'API nelle fixture dei test.
+
+CAP, `getLabels`, i numeri di tracking da `trackings` e il flag
+`delivery_to_parcelshop` vengono solo dalla seconda fonte e non hanno ancora
+girato in produzione. Se una risposta reale è diversa,
+[apri una issue](https://github.com/federicokalik/packlink-nextjs/issues) con il
+payload, senza dati personali.
+
+Escluso di proposito: la **lista** delle spedizioni. Né il modulo ufficiale né
+l'uso in produzione la chiamano, quindi non c'è un endpoint confermato.
+
+## Confronto con packlink-js
+
+[packlink-js](https://github.com/MwSpaceLLC/packlink-js) (MwSpace, Apache-2.0)
+è l'altro client JavaScript non ufficiale per Packlink PRO. Alla versione 1.0.48
+(ottobre 2026):
+
+|                                                    | packlink-nextjs                                     | packlink-js                            |
+| -------------------------------------------------- | --------------------------------------------------- | -------------------------------------- |
+| Linguaggio                                         | TypeScript, ESM + CJS, con tipi                     | JavaScript (CommonJS), senza tipi      |
+| Dipendenze a runtime                               | nessuna (Fetch API)                                 | `axios`, `qs`                          |
+| Configurazione                                     | un client per istanza                               | una sola API key per tutto il processo |
+| Errori                                             | lancia `PacklinkError` con `code`, `status`, `body` | li stampa e restituisce `{ error }`    |
+| Timeout                                            | 6 s in lettura, 20 s in scrittura                   | nessuno impostato                      |
+| Servizi / quote                                    | ✓ normalizzati, dal più economico, filtro corrieri  | ✓ risposta grezza                      |
+| Collo senza misure                                 | 20 × 20 × 20 cm                                     | 5 × 5 × 5 cm (`Carrier.quote`)         |
+| Punti di ritiro                                    | ✓ con route, hook React e mappa                     | —                                      |
+| Crea / leggi / annulla spedizioni                  | ✓                                                   | ✓                                      |
+| Etichette                                          | ✓                                                   | —                                      |
+| Lista spedizioni                                   | — (vedi sopra)                                      | ✓ (`GET /shipments`)                   |
+| CAP                                                | verifica esatta + ricerca per zona postale          | ricerca nel paese configurato          |
+| Magazzini (indirizzi mittente salvati su Packlink) | — (il mittente viene dalla tua config)              | ✓ lista, crea, modifica, elimina       |
+| Statistiche del pannello                           | —                                                   | ✓                                      |
+| Checkout (soglia gratis, IVA, margine, ripiego)    | ✓                                                   | —                                      |
+| Route handler Next.js                              | ✓                                                   | —                                      |
+| Sync stati pianificata + template scheduler        | ✓                                                   | —                                      |
+| Test                                               | ✓ vitest, CI su Node 20/22/24                       | nessuno nel repository                 |
+| Licenza                                            | MIT                                                 | Apache-2.0                             |
+
+Se ti servono gestione dei magazzini o statistiche del pannello, packlink-js le
+ha già pronte; qui sono a una chiamata `client.request()`, senza tipi.
 
 ## Sviluppo
 

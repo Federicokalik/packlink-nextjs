@@ -8,7 +8,15 @@ import {
 } from "../src";
 
 function shipment(reference: string, status: string | null): PacklinkShipment {
-  return { reference, status, trackingNumber: null, trackingUrl: null, labelUrl: null, raw: {} };
+  return {
+    reference,
+    status,
+    trackingNumber: null,
+    trackingNumbers: [],
+    trackingUrl: null,
+    labelUrl: null,
+    raw: {},
+  };
 }
 
 function clientWith(statuses: Record<string, string | null | Error>) {
@@ -112,5 +120,34 @@ describe("syncShipments", () => {
     );
     const result = await syncShipments({ client: clientWith({}), store, limit: 5 });
     expect(result.processed).toBe(5);
+  });
+
+  it("asks for the label until one is stored", async () => {
+    const store = createMemoryShipmentStore([
+      { id: 1, reference: "A", status: null },
+      { id: 2, reference: "B", status: null, labelUrl: "https://labels.example/B.pdf" },
+    ]);
+    const getShipment = vi.fn(async (reference: string, options?: { includeLabels?: boolean }) => ({
+      ...shipment(reference, "READY_TO_PRINT"),
+      labelUrl: options?.includeLabels ? `https://labels.example/${reference}.pdf` : null,
+    }));
+
+    await syncShipments({ client: { getShipment }, store });
+    expect(getShipment).toHaveBeenCalledWith("A", { includeLabels: true });
+    expect(getShipment).toHaveBeenCalledWith("B", { includeLabels: false });
+    expect(store.records.map((record) => record.labelUrl)).toEqual([
+      "https://labels.example/A.pdf",
+      "https://labels.example/B.pdf",
+    ]);
+
+    getShipment.mockClear();
+    await syncShipments({ client: { getShipment }, store });
+    expect(getShipment).toHaveBeenCalledWith("A", { includeLabels: false });
+
+    getShipment.mockClear();
+    await syncShipments({ client: { getShipment }, store, includeLabels: false });
+    expect(getShipment.mock.calls.every(([, options]) => options?.includeLabels === false)).toBe(
+      true,
+    );
   });
 });

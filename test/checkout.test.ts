@@ -9,7 +9,8 @@ function service(overrides: Partial<PacklinkService>): PacklinkService {
     carrierName: "BRT",
     netCents: 1000,
     transitTime: null,
-    dropoff: false,
+    requiresDropoffPoint: false,
+    senderDropoff: false,
     raw: {},
     ...overrides,
   };
@@ -34,7 +35,7 @@ describe("priceWithVatAndMarkup", () => {
 
 describe("resolveShippingOptions", () => {
   it("offers live Packlink options with VAT and markup, plus the extras", async () => {
-    const listServices = vi.fn(async () => [service({ serviceId: 7, dropoff: true })]);
+    const listServices = vi.fn(async () => [service({ serviceId: 7, requiresDropoffPoint: true })]);
     const options = await resolveShippingOptions({ configured: true, listServices }, base);
 
     expect(options).toEqual([
@@ -44,7 +45,7 @@ describe("resolveShippingOptions", () => {
         amountCents: 1342,
         kind: "packlink",
         packlinkServiceId: 7,
-        requiresDropoff: true,
+        requiresDropoffPoint: true,
         carrierName: "BRT",
         serviceName: "Standard",
         transitTime: null,
@@ -52,7 +53,7 @@ describe("resolveShippingOptions", () => {
       pickup,
     ]);
     expect(listServices).toHaveBeenCalledWith(
-      expect.objectContaining({ to: { zip: "20121", country: "IT" }, includeDropoff: true }),
+      expect.objectContaining({ to: { zip: "20121", country: "IT" }, includeDropoffPoint: true }),
     );
   });
 

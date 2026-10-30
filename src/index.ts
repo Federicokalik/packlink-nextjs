@@ -4,9 +4,12 @@ export type {
   DropoffPointView,
   PacklinkAddress,
   PacklinkDropoffPoint,
+  PacklinkPostalCode,
+  PacklinkPostalZone,
   PacklinkService,
   PacklinkShipment,
   Parcel,
+  PostalCodeView,
   PostalLocation,
 } from "./types";
 
@@ -27,9 +30,12 @@ export {
   type CreateShipmentInput,
   type HttpMethod,
   type ListDropoffsInput,
+  type ListPostalZonesInput,
   type ListServicesInput,
+  type LookupPostalCodeInput,
   type PacklinkClient,
   type PacklinkClientOptions,
+  type SearchPostalCodesInput,
 } from "./client";
 
 export { createPacklinkClientFromEnv, packlinkOptionsFromEnv } from "./env";

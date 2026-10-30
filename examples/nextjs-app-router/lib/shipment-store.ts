@@ -10,7 +10,8 @@ const LOCK = "packlink-sync";
 export const shipmentStore: ShipmentSyncStore = {
   async listOpen(limit) {
     const { rows } = await db.execute({
-      sql: `SELECT id, packlink_reference AS reference, packlink_status AS status
+      sql: `SELECT id, packlink_reference AS reference, packlink_status AS status,
+                   packlink_label_url AS label_url
             FROM orders
             WHERE packlink_reference IS NOT NULL
               AND packlink_reference NOT LIKE 'pending:%'
@@ -24,6 +25,7 @@ export const shipmentStore: ShipmentSyncStore = {
       id: Number(row.id),
       reference: String(row.reference),
       status: row.status === null ? null : String(row.status),
+      labelUrl: row.label_url === null ? null : String(row.label_url),
     }));
   },
 
