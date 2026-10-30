@@ -8,6 +8,11 @@ Packlink has no official SDK for JavaScript or Next.js. This package was
 extracted from a production e-commerce (Next.js 16, App Router) and made
 independent of its database, catalog and hosting.
 
+> **In production.** The integration has been implemented and tested for two
+> months (since August 2026) on [creattivamente.shop](https://creattivamente.shop),
+> with real orders: live quotes at checkout, pickup points, labels created from
+> the admin panel and the scheduled status sync.
+
 [Leggi in italiano](./README.it.md)
 
 > Not affiliated with, endorsed or sponsored by Packlink. "Packlink" is a
