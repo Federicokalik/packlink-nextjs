@@ -1,10 +1,23 @@
-# packlink-nextjs
+<p align="center">
+  <img src="assets/logo.svg" alt="packlink-nextjs" width="160">
+</p>
 
-Unofficial [Packlink PRO](https://pro.packlink.com) integration for **Next.js**:
-live shipping quotes at checkout, pickup-point selection, shipment labels, and a
-scheduled sync that moves your orders forward as parcels travel.
+<h1 align="center">packlink-nextjs</h1>
 
-Packlink has no official SDK for JavaScript or Next.js. This package was
+<p align="center">
+  <strong>Unofficial Packlink PRO integration for Next.js.</strong><br>
+  Live quotes, pickup points, labels and a scheduled status sync. TypeScript, zero runtime dependencies.
+</p>
+
+<p align="center">
+  <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-yellow">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6">
+  <img alt="Next.js App Router" src="https://img.shields.io/badge/Next.js-App%20Router-black">
+  <img alt="Node.js 20 or later" src="https://img.shields.io/badge/node-%E2%89%A5%2020-339933">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue">
+</p>
+
+[Packlink PRO](https://pro.packlink.com) has no official SDK for JavaScript or Next.js. This package was
 extracted from a production e-commerce (Next.js 16, App Router) and made
 independent of its database, catalog and hosting.
 

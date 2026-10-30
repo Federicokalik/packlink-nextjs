@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" width="160" height="160" role="img" aria-labelledby="title">
+  <title id="title">packlink-nextjs</title>
+  <!-- Route behind the parcel -->
+  <path d="M18 132 C 40 112, 34 92, 58 84" fill="none" stroke="#94A3B8" stroke-width="5" stroke-linecap="round" stroke-dasharray="2 12"/>
+  <circle cx="18" cy="132" r="7" fill="#94A3B8"/>
+  <!-- Parcel: top, left and right faces -->
+  <path d="M96 22 L142 46 L96 70 L50 46 Z" fill="#FDBA74"/>
+  <path d="M50 46 L96 70 L96 126 L50 102 Z" fill="#F97316"/>
+  <path d="M96 70 L142 46 L142 102 L96 126 Z" fill="#C2410C"/>
+  <!-- Tape across the top and down the right face -->
+  <path d="M73 34 L119 58 L119 74 L108 80 L108 64 L62 40 Z" fill="#FFF7ED" opacity="0.9"/>
+  <!-- Shipping label on the left face, skewed to the face's slope (24 / 46) -->
+  <g transform="matrix(1 0.5217 0 1 0 0)">
+    <rect x="57" y="38" width="32" height="24" rx="3" fill="#FFFFFF" stroke="#7C2D12" stroke-width="2"/>
+    <text x="73" y="55.5" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#3178C6">TS</text>
+  </g>
+  <!-- Edges -->
+  <path d="M96 22 L142 46 L142 102 L96 126 L50 102 L50 46 Z M50 46 L96 70 L142 46 M96 70 L96 126" fill="none" stroke="#7C2D12" stroke-width="3" stroke-linejoin="round"/>
+</svg>
