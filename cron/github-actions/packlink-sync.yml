@@ -1,0 +1,31 @@
+# Copy to .github/workflows/packlink-sync.yml in any repository you own.
+# Repository secrets needed:
+#   PACKLINK_SYNC_URL         https://shop.example.com/api/jobs/packlink-sync
+#   PACKLINK_SYNC_CRON_SECRET same value as in the app
+name: Packlink status sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: packlink-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call the sync route
+        env:
+          SYNC_URL: ${{ secrets.PACKLINK_SYNC_URL }}
+          CRON_SECRET: ${{ secrets.PACKLINK_SYNC_CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            --request POST \
+            --header "Authorization: Bearer ${CRON_SECRET}" \
+            "${SYNC_URL}"

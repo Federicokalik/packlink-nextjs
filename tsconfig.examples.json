@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "packlink-nextjs": ["src/index.ts"],
+      "packlink-nextjs/next": ["src/next/index.ts"],
+      "packlink-nextjs/react": ["src/react/index.ts"],
+      "packlink-nextjs/map": ["src/map/index.tsx"],
+      "@/*": ["examples/nextjs-app-router/*"]
+    }
+  },
+  "include": ["examples/nextjs-app-router"]
+}

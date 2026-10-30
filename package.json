@@ -1,0 +1,129 @@
+{
+  "name": "packlink-nextjs",
+  "version": "0.1.0",
+  "description": "Unofficial Packlink PRO integration for Next.js: live shipping quotes, pickup points, shipment labels and a scheduled status sync.",
+  "keywords": [
+    "packlink",
+    "packlink-pro",
+    "shipping",
+    "shipping-rates",
+    "pickup-points",
+    "nextjs",
+    "ecommerce",
+    "checkout"
+  ],
+  "license": "MIT",
+  "author": "Federico Calicchia (https://github.com/federicokalik)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/federicokalik/packlink-nextjs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/federicokalik/packlink-nextjs/issues"
+  },
+  "homepage": "https://github.com/federicokalik/packlink-nextjs#readme",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "README.it.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./next": {
+      "import": {
+        "types": "./dist/next/index.d.ts",
+        "default": "./dist/next/index.js"
+      },
+      "require": {
+        "types": "./dist/next/index.d.cts",
+        "default": "./dist/next/index.cjs"
+      }
+    },
+    "./react": {
+      "import": {
+        "types": "./dist/react/index.d.ts",
+        "default": "./dist/react/index.js"
+      },
+      "require": {
+        "types": "./dist/react/index.d.cts",
+        "default": "./dist/react/index.cjs"
+      }
+    },
+    "./map": {
+      "import": {
+        "types": "./dist/map/index.d.ts",
+        "default": "./dist/map/index.js"
+      },
+      "require": {
+        "types": "./dist/map/index.d.cts",
+        "default": "./dist/map/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "next": [
+        "./dist/next/index.d.ts"
+      ],
+      "react": [
+        "./dist/react/index.d.ts"
+      ],
+      "map": [
+        "./dist/map/index.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsup",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.examples.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "peerDependencies": {
+    "leaflet": "^1.9.0",
+    "react": ">=18"
+  },
+  "peerDependenciesMeta": {
+    "leaflet": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@libsql/client": "^0.15.15",
+    "@types/leaflet": "^1.9.22",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19.3.0",
+    "leaflet": "^1.9.4",
+    "prettier": "^3.9.10",
+    "react": "^19.3.1",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

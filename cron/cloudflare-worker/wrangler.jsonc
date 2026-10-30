@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "packlink-sync-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-21",
+  // No public URL: the Worker only runs from the Cron Trigger.
+  "workers_dev": false,
+  "triggers": {
+    "crons": ["*/15 * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "PACKLINK_SYNC_URL": "https://shop.example.com/api/jobs/packlink-sync",
+  },
+  // Set with: npx wrangler secret put PACKLINK_SYNC_CRON_SECRET
+  "secrets": {
+    "required": ["PACKLINK_SYNC_CRON_SECRET"],
+  },
+}

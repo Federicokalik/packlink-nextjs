@@ -1,0 +1,10 @@
+node_modules/
+dist/
+coverage/
+*.tgz
+.env
+.env.*
+!.env.example
+.wrangler/
+local.db
+.DS_Store
