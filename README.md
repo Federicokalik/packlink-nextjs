@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo.svg" alt="packlink-nextjs" width="160">
+  <img src="https://cdn.jsdelivr.net/gh/Federicokalik/packlink-nextjs@main/assets/logo.svg" alt="packlink-nextjs" width="160">
 </p>
 
 <h1 align="center">packlink-nextjs</h1>
@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.npmjs.com/package/packlink-nextjs"><img alt="npm version" src="https://img.shields.io/npm/v/packlink-nextjs"></a>
   <img alt="Status: beta" src="https://img.shields.io/badge/status-beta-yellow">
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6">
   <img alt="Next.js App Router" src="https://img.shields.io/badge/Next.js-App%20Router-black">

@@ -16,12 +16,12 @@
   "author": "Federico Calicchia (https://github.com/federicokalik)",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/federicokalik/packlink-nextjs.git"
+    "url": "git+https://github.com/Federicokalik/packlink-nextjs.git"
   },
   "bugs": {
-    "url": "https://github.com/federicokalik/packlink-nextjs/issues"
+    "url": "https://github.com/Federicokalik/packlink-nextjs/issues"
   },
-  "homepage": "https://github.com/federicokalik/packlink-nextjs#readme",
+  "homepage": "https://github.com/Federicokalik/packlink-nextjs#readme",
   "type": "module",
   "sideEffects": false,
   "engines": {
