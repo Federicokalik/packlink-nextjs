@@ -60,7 +60,13 @@ independent of its database, catalog and hosting.
 
 ```bash
 npm install packlink-nextjs
+# or
+pnpm add packlink-nextjs
+yarn add packlink-nextjs
+bun add packlink-nextjs
 ```
+
+All of them install from the npm registry.
 
 | Import                  | What                                                | Peer dependencies      |
 | ----------------------- | --------------------------------------------------- | ---------------------- |

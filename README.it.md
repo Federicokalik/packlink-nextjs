@@ -44,7 +44,13 @@ ed è più dettagliata sulle API.
 
 ```bash
 npm install packlink-nextjs
+# oppure
+pnpm add packlink-nextjs
+yarn add packlink-nextjs
+bun add packlink-nextjs
 ```
+
+Tutti installano dal registry npm.
 
 | Import                  | Contenuto                                          | Peer dependency        |
 | ----------------------- | -------------------------------------------------- | ---------------------- |
