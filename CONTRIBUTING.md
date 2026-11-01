@@ -26,6 +26,17 @@ Before opening a pull request, run all three and `npm run format`.
 - Tests use a mocked `fetch` (`test/helpers.ts`): no test may call the real
   Packlink API.
 
+## Releasing
+
+Releases are published to npm by `.github/workflows/release.yml` through
+trusted publishing, so no npm token is stored in the repository.
+
+1. Add the new version to `CHANGELOG.md` and commit it.
+2. Run `npm version patch` (or `minor`): it bumps `package.json` and creates
+   the `vX.Y.Z` tag.
+3. Run `git push --follow-tags`. The workflow checks that the tag matches
+   `package.json`, runs the checks and publishes with provenance.
+
 ## Reporting a security issue
 
 Please do not open a public issue: use GitHub's private vulnerability
