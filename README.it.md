@@ -311,6 +311,19 @@ l'uso in produzione la chiamano, quindi non c'è un endpoint confermato.
 Se ti servono gestione dei magazzini o statistiche del pannello, packlink-js le
 ha già pronte; qui sono a una chiamata `client.request()`, senza tipi.
 
+## Agenti AI
+
+È il 2026, quindi sì: questo pacchetto è stato realizzato con l'assistenza di
+agenti AI. Decisioni, revisione e responsabilità restano umane: il codice è
+coperto da test (`fetch` simulato, mai l'API reale), verificato in CI a ogni
+push, e gira in produzione su creattivamente.shop.
+
+Usi un agente per integrare il pacchetto nella tua app o per lavorare su questo
+repository? Indicagli [AGENTS.md](./AGENTS.md): entry point, regole da non
+violare (API key solo lato server, ricalcolo del prezzo all'ordine, spedizioni a
+pagamento) e comandi del repository. Il file è incluso anche nel pacchetto, in
+`node_modules/packlink-nextjs/AGENTS.md`.
+
 ## Sviluppo
 
 ```bash

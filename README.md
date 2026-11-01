@@ -53,6 +53,7 @@ independent of its database, catalog and hosting.
 - [Compared to packlink-js](#compared-to-packlink-js)
 - [Runtime notes](#runtime-notes)
 - [Security](#security)
+- [AI agents](#ai-agents)
 - [Development](#development)
 
 ## Install
@@ -478,6 +479,19 @@ without types.
   bearer token in constant time. Use a long random value.
 - Pickup-point names and addresses come from a third party: the map builds its
   popups with DOM text nodes, never HTML strings. Do the same in your UI.
+
+## AI agents
+
+It's 2026, so yes: this package was built with the help of AI coding agents.
+Decisions, review and responsibility stay human: the code is covered by tests
+(mocked `fetch`, never the real API), checked in CI on every push, and runs in
+production on creattivamente.shop.
+
+Using an agent to add the package to your app, or to work on this repository?
+Point it at [AGENTS.md](./AGENTS.md): entry points, the rules that must not be
+broken (server-only API key, re-pricing at order time, billable shipments) and
+the repository commands. The file also ships with the package, at
+`node_modules/packlink-nextjs/AGENTS.md`.
 
 ## Development
 

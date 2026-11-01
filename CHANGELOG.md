@@ -19,3 +19,4 @@ First public version, extracted from a production Next.js storefront.
 - `useDropoffPoints` hook and Leaflet `DropoffPointMap`.
 - Storage-agnostic status sync with lock, batch limit and at-least-once transitions.
 - Scheduler templates: Cloudflare Workers Cron, Vercel Cron, GitHub Actions, generic.
+- `AGENTS.md`: guide for AI coding agents, shipped with the package.
