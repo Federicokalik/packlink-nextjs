@@ -4,6 +4,11 @@ All notable changes are documented here. The project follows
 [Semantic Versioning](https://semver.org); until 1.0 a minor version may
 contain breaking changes.
 
+## 0.1.1 — 2026-11-01
+
+- First release published from GitHub Actions through npm trusted publishing,
+  with provenance. No code changes.
+
 ## 0.1.0 — 2026-11-01
 
 First public version, extracted from a production Next.js storefront.
