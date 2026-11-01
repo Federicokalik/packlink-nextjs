@@ -1,6 +1,6 @@
 {
   "name": "packlink-nextjs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Unofficial Packlink PRO integration for Next.js: live shipping quotes, pickup points, shipment labels and a scheduled status sync.",
   "keywords": [
     "packlink",
